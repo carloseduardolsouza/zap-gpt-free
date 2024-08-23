@@ -1,10 +1,30 @@
 import { type Whatsapp } from '@wppconnect-team/wppconnect';
 
 export function splitMessages(text: string): string[] {
-  const pattern =
-    /(?:http[s]?:\/\/[^\s]+)|(?:www\.[^\s]+)|[^.?!]+(?:[.?!]+["']?|$)/g;
-  const matches = text.match(pattern);
-  return matches ?? [];
+  const complexPattern =
+    /(http[s]?:\/\/[^\s]+)|(www\.[^\s]+)|([^\s]+@[^\s]+\.[^\s]+)|(["'].*?["'])|(\b\d+\.\s)|(\w+\.\w+)/g;
+  const placeholders = text.match(complexPattern) ?? [];
+
+  const placeholder = 'PLACEHOLDER_';
+  let currentIndex = 0;
+  const textWithPlaceholders = text.replace(
+    complexPattern,
+    () => `${placeholder}${currentIndex++}`
+  );
+
+  const splitPattern = /(?<!\b\d+\.\s)(?<!\w+\.\w+)[^.?!]+(?:[.?!]+["']?|$)/g;
+  let parts = textWithPlaceholders.match(splitPattern) ?? ([] as string[]);
+
+  if (placeholders.length > 0) {
+    parts = parts.map((part) =>
+      placeholders.reduce(
+        (acc, val, idx) => acc.replace(`${placeholder}${idx}`, val),
+        part
+      )
+    );
+  }
+
+  return parts;
 }
 
 export async function sendMessagesWithDelay({
@@ -28,31 +48,4 @@ export async function sendMessagesWithDelay({
         console.error('Erro ao enviar mensagem:', erro);
       });
   }
-}
-
-export async function getHistoryMessages({
-  targetNumber,
-  client,
-  history,
-}: {
-  targetNumber: string;
-  client: Whatsapp;
-  history: string[];
-}): Promise<void> {
-  if (history.length > 0) return;
-  const historyInternal = await client.getAllMessagesInChat(
-    targetNumber,
-    true,
-    false
-  );
-  const textMessages = historyInternal
-    .filter((msg) => msg.type === 'chat')
-    .slice(-30)
-    .map((msg) => {
-      const isFromMe = msg.from === '555192194386@c.us';
-      return `${
-        isFromMe ? 'mensagem marcus' : `mensagem ${msg.sender.shortName}`
-      }: ${msg.body}`;
-    });
-  history = textMessages;
 }
